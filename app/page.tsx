@@ -14,8 +14,7 @@ export default function Home() {
             AI Tutor Analytics
           </h1>
           <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
-            Submit answers, get AI feedback, and review your history. Theme
-            follows your system appearance.
+            Submit answers, get AI feedback, and review your history.
           </p>
         </header>
 

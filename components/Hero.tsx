@@ -2,15 +2,25 @@
 
 import { useState } from "react";
 
+type FeedbackPayload = {
+  score?: number;
+  topic?: string;
+  subtopic?: string;
+};
+
 export default function Hero() {
   const [question, setQuestion] = useState("");
   const [answer, setAnswer] = useState("");
   const [loading, setLoading] = useState(false);
+  const [formError, setFormError] = useState("");
+  const [formSuccess, setFormSuccess] = useState("");
 
   async function handleSubmit() {
     if (loading) return;
 
     setLoading(true);
+    setFormError("");
+    setFormSuccess("");
 
     try {
       const res = await fetch("/api/feedback", {
@@ -19,23 +29,57 @@ export default function Hero() {
         body: JSON.stringify({ question, answer }),
       });
 
-      const data = await res.json();
+      let data: unknown;
+      try {
+        data = await res.json();
+      } catch {
+        setFormError(
+          "The server sent a response we could not read. Please try again."
+        );
+        return;
+      }
+
+      const payload = data as {
+        error?: string;
+        details?: string;
+      } & FeedbackPayload;
 
       if (!res.ok) {
-        const message =
-          typeof data?.error === "string" ? data.error : "Error saving";
-        alert(message);
-      } else {
-        alert(`Saved. Score: ${data.score}/10, Topic: ${data.topic}`);
-        setQuestion("");
-        setAnswer("");
+        const base =
+          typeof payload.error === "string" ? payload.error : "Request failed";
+        const extra =
+          typeof payload.details === "string" && payload.details.length > 0
+            ? ` ${payload.details}`
+            : "";
+        setFormError(`${base}${extra}`.trim());
+        return;
       }
+
+      const topic = typeof payload.topic === "string" ? payload.topic : "—";
+      const subtopic =
+        typeof payload.subtopic === "string" && payload.subtopic.length > 0
+          ? payload.subtopic
+          : null;
+      const score =
+        typeof payload.score === "number" && Number.isFinite(payload.score)
+          ? payload.score
+          : "—";
+
+      setFormSuccess(
+        subtopic
+          ? `Saved. Score: ${score}/10 · ${topic} › ${subtopic}`
+          : `Saved. Score: ${score}/10 · ${topic}`
+      );
+      setQuestion("");
+      setAnswer("");
     } catch (err) {
       console.error(err);
-      alert("Something went wrong");
+      setFormError(
+        "Something went wrong. Check your connection and try again."
+      );
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
   }
 
   return (
@@ -67,7 +111,11 @@ export default function Hero() {
             className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground outline-none ring-ring/0 transition-shadow focus:border-ring focus:ring-2 focus:ring-ring/20"
             placeholder="e.g. Explain photosynthesis"
             value={question}
-            onChange={(e) => setQuestion(e.target.value)}
+            onChange={(e) => {
+              setQuestion(e.target.value);
+              if (formError) setFormError("");
+              if (formSuccess) setFormSuccess("");
+            }}
           />
         </div>
         <div>
@@ -83,7 +131,11 @@ export default function Hero() {
             className="w-full resize-y rounded-lg border border-input bg-background px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground outline-none ring-ring/0 transition-shadow focus:border-ring focus:ring-2 focus:ring-ring/20"
             placeholder="Type your response here…"
             value={answer}
-            onChange={(e) => setAnswer(e.target.value)}
+            onChange={(e) => {
+              setAnswer(e.target.value);
+              if (formError) setFormError("");
+              if (formSuccess) setFormSuccess("");
+            }}
           />
         </div>
       </div>
@@ -97,6 +149,24 @@ export default function Hero() {
         >
           {loading ? "Submitting…" : "Submit & get feedback"}
         </button>
+
+        {formError ? (
+          <p
+            role="alert"
+            className="mt-3 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+          >
+            {formError}
+          </p>
+        ) : null}
+
+        {formSuccess ? (
+          <p
+            aria-live="polite"
+            className="mt-3 rounded-lg border border-border bg-surface-subtle px-3 py-2 text-sm text-card-foreground"
+          >
+            {formSuccess}
+          </p>
+        ) : null}
       </div>
     </section>
   );
