@@ -7,14 +7,37 @@ type SubmissionRow = {
   id: string;
   question: string;
   answer: string;
-  feedback?: string | null;
   score?: number | null;
   topic?: string | null;
-  correctness?: string | null;
-  clarity?: string | null;
-  improvement?: string | null;
+  subtopic?: string | null;
+  strengths?: string[] | null;
+  misconceptions?: string[] | null;
+  missing_concepts?: string[] | null;
+  suggested_next_step?: string | null;
+  confidence_estimate?: "low" | "medium" | "high" | null;
+  reasoning_quality?: number | null;
+  answer_completeness?: number | null;
   created_at?: string;
 };
+
+function renderTagList(items: string[] | null | undefined, emptyLabel: string) {
+  if (!items || items.length === 0) {
+    return <p className="text-sm text-muted-foreground">{emptyLabel}</p>;
+  }
+
+  return (
+    <ul className="flex flex-wrap gap-2">
+      {items.map((item, index) => (
+        <li
+          key={`${item}-${index}`}
+          className="rounded-full border border-border bg-background px-2.5 py-1 text-xs text-foreground"
+        >
+          {item}
+        </li>
+      ))}
+    </ul>
+  );
+}
 
 export default function SubmissionsList() {
   const [submissions, setSubmissions] = useState<SubmissionRow[]>([]);
@@ -107,64 +130,76 @@ export default function SubmissionsList() {
               <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
                 {item.answer}
               </p>
-              {(item.score != null ||
-                item.topic ||
-                item.correctness ||
-                item.clarity ||
-                item.improvement) && (
-                <div className="mt-4 space-y-2 rounded-lg border border-border bg-surface-subtle px-3 py-3 text-sm">
-                  {item.score != null && (
-                    <p className="text-card-foreground">
-                      <span className="font-medium text-muted-foreground">
-                        Score:{" "}
-                      </span>
-                      {item.score}/10
+              <div className="mt-4 rounded-lg border border-border bg-surface-subtle p-4">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    Score
+                  </span>
+                  <span className="rounded-md bg-background px-2 py-1 text-sm font-semibold text-card-foreground">
+                    {item.score ?? "N/A"}/10
+                  </span>
+                  {item.confidence_estimate ? (
+                    <span className="rounded-md border border-border px-2 py-1 text-xs text-muted-foreground">
+                      Confidence: {item.confidence_estimate}
+                    </span>
+                  ) : null}
+                </div>
+
+                <p className="mt-3 text-sm text-card-foreground">
+                  <span className="font-medium text-muted-foreground">Topic: </span>
+                  {item.topic ?? "N/A"}
+                  {item.subtopic ? ` / ${item.subtopic}` : ""}
+                </p>
+
+                <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                  <div>
+                    <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                      Strengths
                     </p>
+                    {renderTagList(item.strengths, "No strengths identified yet.")}
+                  </div>
+                  <div>
+                    <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                      Misconceptions
+                    </p>
+                    {renderTagList(
+                      item.misconceptions,
+                      "No misconceptions detected."
+                    )}
+                  </div>
+                </div>
+
+                <div className="mt-4">
+                  <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    Missing concepts
+                  </p>
+                  {renderTagList(
+                    item.missing_concepts,
+                    "No missing concepts identified."
                   )}
-                  {item.topic ? (
-                    <p className="text-card-foreground">
-                      <span className="font-medium text-muted-foreground">
-                        Topic:{" "}
-                      </span>
-                      {item.topic}
-                    </p>
-                  ) : null}
-                  {item.correctness ? (
-                    <p className="text-card-foreground">
-                      <span className="font-medium text-muted-foreground">
-                        Correctness:{" "}
-                      </span>
-                      {item.correctness}
-                    </p>
-                  ) : null}
-                  {item.clarity ? (
-                    <p className="text-card-foreground">
-                      <span className="font-medium text-muted-foreground">
-                        Clarity:{" "}
-                      </span>
-                      {item.clarity}
-                    </p>
-                  ) : null}
-                  {item.improvement ? (
-                    <p className="text-card-foreground">
-                      <span className="font-medium text-muted-foreground">
-                        Improvement:{" "}
-                      </span>
-                      {item.improvement}
-                    </p>
-                  ) : null}
                 </div>
-              )}
-              {item.feedback ? (
-                <div className="mt-4 rounded-lg border border-border bg-surface-subtle px-3 py-2.5">
-                  <p className="text-xs font-medium text-muted-foreground">
-                    AI feedback
+
+                <div className="mt-4 space-y-1 text-sm">
+                  <p className="text-card-foreground">
+                    <span className="font-medium text-muted-foreground">
+                      Suggested next step:{" "}
+                    </span>
+                    {item.suggested_next_step ?? "Not provided"}
                   </p>
-                  <p className="mt-1 text-sm leading-relaxed text-card-foreground">
-                    {item.feedback}
+                  <p className="text-card-foreground">
+                    <span className="font-medium text-muted-foreground">
+                      Reasoning quality:{" "}
+                    </span>
+                    {item.reasoning_quality ?? "N/A"}/10
+                  </p>
+                  <p className="text-card-foreground">
+                    <span className="font-medium text-muted-foreground">
+                      Answer completeness:{" "}
+                    </span>
+                    {item.answer_completeness ?? "N/A"}/10
                   </p>
                 </div>
-              ) : null}
+              </div>
             </article>
           </li>
         ))}

@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { supabase } from "../lib/supabase";
 
 export default function Hero() {
   const [question, setQuestion] = useState("");
@@ -22,23 +21,12 @@ export default function Hero() {
 
       const data = await res.json();
 
-      const { error } = await supabase.from("submissions").insert([
-        {
-          question,
-          answer,
-          topic: data.topic,
-          score: data.score,
-          correctness: data.correctness,
-          clarity: data.clarity,
-          improvement: data.improvement,
-        },
-      ]);
-
-      if (error) {
-        console.error(error);
-        alert("Error saving");
+      if (!res.ok) {
+        const message =
+          typeof data?.error === "string" ? data.error : "Error saving";
+        alert(message);
       } else {
-        alert("Saved with AI feedback!");
+        alert(`Saved. Score: ${data.score}/10, Topic: ${data.topic}`);
         setQuestion("");
         setAnswer("");
       }
