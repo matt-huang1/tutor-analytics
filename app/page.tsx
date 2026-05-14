@@ -1,5 +1,6 @@
 import Hero from "../components/Hero";
 import Features from "../components/Features";
+import LearningAnalytics from "../components/LearningAnalytics";
 import SubmissionsList from "../components/SubmissionsList";
 
 export default function Home() {
@@ -21,7 +22,33 @@ export default function Home() {
         <div className="flex flex-col gap-10 sm:gap-12">
           <Hero />
           <Features />
-          <SubmissionsList />
+
+          <section
+            aria-labelledby="analytics-section-title"
+            className="rounded-2xl border border-border bg-card/40 p-5 shadow-sm sm:p-6"
+          >
+            <header className="border-b border-border pb-4">
+              <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
+                Progress
+              </p>
+              <h2
+                id="analytics-section-title"
+                className="mt-1 text-lg font-semibold tracking-tight text-foreground"
+              >
+                Analytics dashboard
+              </h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Updates automatically right after you submit — no refresh needed.
+              </p>
+            </header>
+            <div className="pt-5">
+              <LearningAnalytics embedded />
+            </div>
+          </section>
+
+          <div className="rounded-2xl border border-border bg-card/30 p-5 shadow-sm sm:p-6">
+            <SubmissionsList />
+          </div>
         </div>
       </div>
     </main>

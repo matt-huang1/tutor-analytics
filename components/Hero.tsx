@@ -2,15 +2,20 @@
 
 import { useState } from "react";
 
+type ConfidenceLevel = "low" | "medium" | "high" | "";
+
 type FeedbackPayload = {
   score?: number;
   topic?: string;
   subtopic?: string;
+  student_confidence?: string;
 };
 
 export default function Hero() {
   const [question, setQuestion] = useState("");
   const [answer, setAnswer] = useState("");
+  const [studentConfidence, setStudentConfidence] =
+    useState<ConfidenceLevel>("");
   const [loading, setLoading] = useState(false);
   const [formError, setFormError] = useState("");
   const [formSuccess, setFormSuccess] = useState("");
@@ -22,11 +27,21 @@ export default function Hero() {
     setFormError("");
     setFormSuccess("");
 
+    if (!studentConfidence) {
+      setFormError('Choose how confident you felt before seeing feedback ("low", "medium", or "high").');
+      setLoading(false);
+      return;
+    }
+
     try {
       const res = await fetch("/api/feedback", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ question, answer }),
+        body: JSON.stringify({
+          question,
+          answer,
+          student_confidence: studentConfidence,
+        }),
       });
 
       let data: unknown;
@@ -72,6 +87,12 @@ export default function Hero() {
       );
       setQuestion("");
       setAnswer("");
+      setStudentConfidence("");
+      if (typeof window !== "undefined") {
+        queueMicrotask(() => {
+          window.dispatchEvent(new CustomEvent("submissions:refresh"));
+        });
+      }
     } catch (err) {
       console.error(err);
       setFormError(
@@ -94,11 +115,35 @@ export default function Hero() {
         New submission
       </h2>
       <p className="mt-1 text-sm text-muted-foreground">
-        Ask a question and paste your answer. We&apos;ll return feedback and
-        save it to your list below.
+        Rate how confident you felt <em>before</em> feedback, then submit your
+        answer. We save diagnostics and update your analytics below.
       </p>
 
       <div className="mt-6 space-y-4">
+        <div>
+          <label
+            htmlFor="confidence"
+            className="mb-1.5 block text-xs font-medium text-muted-foreground"
+          >
+            Your confidence (before feedback)
+          </label>
+          <select
+            id="confidence"
+            className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm text-foreground outline-none ring-ring/0 transition-shadow focus:border-ring focus:ring-2 focus:ring-ring/20"
+            value={studentConfidence}
+            onChange={(e) => {
+              setStudentConfidence(e.target.value as ConfidenceLevel);
+              if (formError) setFormError("");
+              if (formSuccess) setFormSuccess("");
+            }}
+          >
+            <option value="">Select…</option>
+            <option value="low">Low — unsure or guessing</option>
+            <option value="medium">Medium — partly sure</option>
+            <option value="high">High — fairly sure</option>
+          </select>
+        </div>
+
         <div>
           <label
             htmlFor="question"
