@@ -55,14 +55,28 @@ The insight engine uses no AI at runtime — it's fully rule-based, auditable, a
 
 ## Running locally
 
+### Instant demo (no API keys required)
+
 ```bash
 npm install
-cp .env.example .env.local  # add OPENAI_API_KEY, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
-node scripts/seed.js        # populate demo data (14 rows, all 4 detectors active)
 npm run dev
 ```
 
-Navigate to `http://localhost:3000` — opens directly on the Insights dashboard.
+Navigate to `http://localhost:3000` — opens directly on the Insights dashboard with a pre-seeded dataset (14 submissions, all 4 detectors active). The analytics engine, insight cards, score distribution, and topic breakdown are all fully interactive with no setup.
+
+The app connects to a shared Supabase instance via an anon key already in the codebase. Reading and exploring the dashboard works immediately for anyone who clones the repo.
+
+### Optional: submit new answers
+
+To evaluate new answers using the AI tutor, add a `.env.local` file:
+
+```bash
+OPENAI_API_KEY=sk-...
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=...
+```
+
+This is only required for the `/submit` flow. The insights dashboard, history, and analytics engine work without it.
 
 ---
 
