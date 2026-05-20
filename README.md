@@ -1,6 +1,6 @@
 # AI Tutor Analytics
 
-An AI-powered learning analytics platform that evaluates student answers, identifies recurring mistake patterns, and surfaces actionable insights — without needing a human tutor to interpret the data.
+An AI-powered learning analytics system that identifies why students repeatedly get questions wrong — not just whether they got them wrong.
 
 ---
 
