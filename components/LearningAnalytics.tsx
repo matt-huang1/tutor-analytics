@@ -9,9 +9,54 @@ import {
 import { supabase } from "../lib/supabase";
 import {
   computeAnalytics,
+  generateInsights,
   type AnalyticsSummary,
-  type SubmissionLike,
+  type Insight,
+  type InsightSeverity,
+  type SubmissionForInsights,
 } from "../lib/analytics";
+import { confidenceClasses } from "../lib/format";
+
+// ─── Sub-components ───────────────────────────────────────────────────────────
+
+const SEVERITY: Record<
+  InsightSeverity,
+  { border: string; badge: string; label: string }
+> = {
+  risk:     { border: "border-l-red-500",   badge: "bg-red-50 text-red-700 dark:bg-red-950/50 dark:text-red-300",         label: "Risk" },
+  warning:  { border: "border-l-amber-500", badge: "bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300", label: "Watch" },
+  strength: { border: "border-l-green-500", badge: "bg-green-50 text-green-700 dark:bg-green-950/50 dark:text-green-300", label: "Strength" },
+  neutral:  { border: "border-l-accent",    badge: "bg-accent-soft text-accent",                                          label: "Insight" },
+};
+
+const INSIGHT_ORDER: Record<InsightSeverity, number> = { strength: 0, neutral: 1, warning: 2, risk: 3 };
+
+function InsightCard({ insight }: { insight: Insight }) {
+  const s = SEVERITY[insight.type];
+  const shadow = insight.type === "risk" ? "shadow-md" : "shadow-sm";
+  return (
+    <div
+      className={`flex flex-col rounded-xl border border-border bg-card p-4 ${shadow} border-l-4 ${s.border}`}
+    >
+      <div className="flex items-start justify-between gap-2">
+        <p className="text-sm font-semibold leading-snug text-foreground">
+          {insight.title}
+        </p>
+        <span
+          className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${s.badge}`}
+        >
+          {s.label}
+        </span>
+      </div>
+      <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+        {insight.description}
+      </p>
+      <p className="mt-auto pt-3 text-[11px] text-muted-foreground/60">
+        {insight.metric}
+      </p>
+    </div>
+  );
+}
 
 function StatCard({
   label,
@@ -23,11 +68,11 @@ function StatCard({
   suffix?: string;
 }) {
   return (
-    <div className="rounded-xl border border-border bg-card px-4 py-3 shadow-sm">
-      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+    <div className="rounded-xl border border-border bg-card px-4 py-4 shadow-sm">
+      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
         {label}
       </p>
-      <p className="mt-1 text-2xl font-semibold tabular-nums text-card-foreground">
+      <p className="mt-1.5 text-2xl font-semibold tabular-nums text-accent">
         {value}
         {suffix ? (
           <span className="text-base font-normal text-muted-foreground">
@@ -41,17 +86,23 @@ function StatCard({
 
 function Histogram({ histogram }: { histogram: number[] }) {
   const max = Math.max(1, ...histogram);
-  const maxBarPx = 96;
+  const maxBarPx = 72;
   return (
-    <div className="space-y-2">
-      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-        Score distribution (1–10)
+    <div className="flex h-full flex-col">
+      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+        Score distribution
       </p>
-      <div className="flex h-[112px] items-end gap-1">
+      <div className="mt-auto flex h-20 items-end gap-1">
         {histogram.map((count, i) => {
           const score = i + 1;
           const barPx =
-            count === 0 ? 4 : Math.max(6, (count / max) * maxBarPx);
+            count === 0 ? 3 : Math.max(4, (count / max) * maxBarPx);
+          const barColor =
+            score <= 2
+              ? "bg-red-400/60 dark:bg-red-500/50"
+              : score <= 7
+              ? "bg-amber-400/60 dark:bg-amber-500/50"
+              : "bg-green-400/60 dark:bg-green-500/50";
           return (
             <div
               key={score}
@@ -59,7 +110,7 @@ function Histogram({ histogram }: { histogram: number[] }) {
               title={`Score ${score}: ${count}`}
             >
               <div
-                className="w-full rounded-t bg-accent/80"
+                className={`w-full rounded-t ${barColor}`}
                 style={{ height: `${barPx}px` }}
               />
               <span className="text-[10px] text-muted-foreground">{score}</span>
@@ -71,13 +122,26 @@ function Histogram({ histogram }: { histogram: number[] }) {
   );
 }
 
+function SectionHeader({ children }: { children: string }) {
+  return (
+    <div className="mb-4 flex items-center gap-3">
+      <span className="whitespace-nowrap text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
+        {children}
+      </span>
+      <div className="flex-1 border-t border-border" />
+    </div>
+  );
+}
+
+// ─── Main component ───────────────────────────────────────────────────────────
+
 type Props = {
-  /** When true, omit outer title/card shell — parent section provides layout */
   embedded?: boolean;
 };
 
 export default function LearningAnalytics({ embedded = false }: Props) {
   const [summary, setSummary] = useState<AnalyticsSummary | null>(null);
+  const [insights, setInsights] = useState<Insight[]>([]);
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
 
@@ -87,19 +151,21 @@ export default function LearningAnalytics({ embedded = false }: Props) {
       setErrorMessage("");
     }
     const { data, error } = await supabase.from("submissions").select(
-      "score, reasoning_quality, answer_completeness, topic, student_confidence, confidence_estimate"
+      "score, reasoning_quality, answer_completeness, topic, student_confidence, confidence_estimate, error_types, created_at"
     );
 
     if (error) {
       console.error(error);
       setErrorMessage(error.message ?? "Could not load analytics.");
       setSummary(null);
+      setInsights([]);
       setLoading(false);
       return;
     }
 
-    const rows = (data ?? []) as SubmissionLike[];
+    const rows = (data ?? []) as SubmissionForInsights[];
     setSummary(computeAnalytics(rows));
+    setInsights(generateInsights(rows));
     setLoading(false);
   }, []);
 
@@ -123,7 +189,7 @@ export default function LearningAnalytics({ embedded = false }: Props) {
     ) : (
       <section
         aria-labelledby="analytics-heading"
-        className={`rounded-2xl border border-border bg-surface-subtle/80 p-6 sm:p-8 ${className ?? ""}`}
+        className={`rounded-2xl border border-border bg-card p-6 shadow-md sm:p-8 ${className ?? ""}`}
       >
         {children}
       </section>
@@ -131,33 +197,34 @@ export default function LearningAnalytics({ embedded = false }: Props) {
 
   if (loading) {
     return shell(
-      <>
-        {!embedded ? (
-          <div className="h-6 w-48 animate-pulse rounded bg-border" />
-        ) : null}
-        <div
-          className={`grid gap-3 sm:grid-cols-3 ${embedded ? "" : "mt-4"}`}
-        >
-          <div className="h-20 animate-pulse rounded-xl bg-border/50" />
-          <div className="h-20 animate-pulse rounded-xl bg-border/40" />
-          <div className="h-20 animate-pulse rounded-xl bg-border/30" />
+      <div className="space-y-6">
+        {!embedded && <div className="h-6 w-52 animate-pulse rounded bg-border" />}
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {[...Array(4)].map((_, i) => (
+            <div key={i} className="h-20 animate-pulse rounded-xl bg-border/40" />
+          ))}
         </div>
-      </>,
-      embedded ? "space-y-4" : undefined
+        <div className="grid gap-4 lg:grid-cols-2">
+          <div className="h-32 animate-pulse rounded-xl bg-border/30" />
+          <div className="h-32 animate-pulse rounded-xl bg-border/25" />
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="h-28 animate-pulse rounded-xl bg-border/20" />
+          <div className="h-28 animate-pulse rounded-xl bg-border/15" />
+          <div className="h-28 animate-pulse rounded-xl bg-border/10" />
+        </div>
+      </div>
     );
   }
 
   if (errorMessage) {
     return shell(
       <>
-        {!embedded ? (
-          <h2
-            id="analytics-heading"
-            className="text-lg font-semibold tracking-tight text-foreground"
-          >
-            Your analytics
-          </h2>
-        ) : null}
+        {!embedded && (
+          <h1 id="analytics-heading" className="text-2xl font-semibold tracking-tight text-foreground">
+            Learning Dashboard
+          </h1>
+        )}
         <p
           role="alert"
           className={`rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive ${embedded ? "" : "mt-2"}`}
@@ -171,112 +238,138 @@ export default function LearningAnalytics({ embedded = false }: Props) {
   if (!summary || summary.count === 0) {
     return shell(
       <>
-        {!embedded ? (
-          <>
-            <h2
-              id="analytics-heading"
-              className="text-lg font-semibold tracking-tight text-foreground"
-            >
-              Your analytics
-            </h2>
-            <p className="mt-2 rounded-xl border border-dashed border-border bg-card/50 px-4 py-6 text-center text-sm text-muted-foreground">
-              Submit at least one answer to see averages and charts here.
-            </p>
-          </>
-        ) : (
-          <p className="rounded-xl border border-dashed border-border bg-card/40 px-4 py-6 text-center text-sm text-muted-foreground">
-            Submit an answer to see your dashboard here.
-          </p>
+        {!embedded && (
+          <h1 id="analytics-heading" className="text-2xl font-semibold tracking-tight text-foreground">
+            Learning Dashboard
+          </h1>
         )}
+        <p className={`rounded-xl border border-dashed border-border bg-surface-subtle px-4 py-8 text-center text-sm text-muted-foreground ${embedded ? "" : "mt-3"}`}>
+          Submit at least one answer to generate insights and see your analytics.
+        </p>
       </>
     );
   }
 
-  const fmt = (n: number | null) =>
-    n === null ? "—" : n.toFixed(1);
+  const fmt = (n: number | null) => (n === null ? "—" : n.toFixed(1));
 
-  const confParts = Object.entries(summary.confidenceBreakdown).filter(
-    ([, n]) => n > 0
+  const sortedInsights = [...insights].sort(
+    (a, b) => INSIGHT_ORDER[a.type] - INSIGHT_ORDER[b.type]
   );
+  const insightGridClass =
+    sortedInsights.length === 1
+      ? ""
+      : sortedInsights.length % 2 === 0
+      ? "grid gap-3 sm:grid-cols-2"
+      : "grid gap-3 sm:grid-cols-2 lg:grid-cols-3";
+
+  const CONFIDENCE_ORDER = ["low", "medium", "high"];
+  const confParts = Object.entries(summary.confidenceBreakdown)
+    .filter(([, n]) => n > 0)
+    .sort(([a], [b]) => CONFIDENCE_ORDER.indexOf(a) - CONFIDENCE_ORDER.indexOf(b));
 
   const body = (
     <>
-      {!embedded ? (
+      {!embedded && (
         <>
-          <h2
+          <h1
             id="analytics-heading"
-            className="text-lg font-semibold tracking-tight text-foreground"
+            className="text-2xl font-semibold tracking-tight text-foreground"
           >
-            Your analytics
-          </h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Summary across all saved submissions (updates after each successful
-            submit).
+            Learning Dashboard
+          </h1>
+          <p className="mt-1.5 text-sm text-muted-foreground">
+            Overview of learning patterns and generated insights from submitted answers.
           </p>
         </>
-      ) : null}
+      )}
 
-      <div className={`grid gap-3 sm:grid-cols-3 ${embedded ? "" : "mt-6"}`}>
-        <StatCard label="Submissions" value={String(summary.count)} />
-        <StatCard
-          label="Avg score"
-          value={fmt(summary.avgScore)}
-          suffix="/10"
-        />
-        <StatCard
-          label="Avg reasoning"
-          value={fmt(summary.avgReasoning)}
-          suffix="/10"
-        />
-      </div>
+      {/* ── Section 1: Overview ─────────────────────────────────────── */}
+      <div className={embedded ? "" : "mt-6"}>
+        <SectionHeader>Overview</SectionHeader>
 
-      <div className="mt-3 grid gap-3 sm:grid-cols-2">
-        <StatCard
-          label="Avg completeness"
-          value={fmt(summary.avgCompleteness)}
-          suffix="/10"
-        />
-        <div className="rounded-xl border border-border bg-card px-4 py-3 shadow-sm">
-          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            Your confidence mix
-          </p>
-          <div className="mt-2 flex flex-wrap gap-2">
-            {confParts.length === 0 ? (
-              <span className="text-sm text-muted-foreground">No data</span>
-            ) : (
-              confParts.map(([level, n]) => (
+        {/* 4-up stat grid */}
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <StatCard label="Submissions" value={String(summary.count)} />
+          <StatCard label="Avg score" value={fmt(summary.avgScore)} suffix="/10" />
+          <StatCard label="Avg reasoning" value={fmt(summary.avgReasoning)} suffix="/10" />
+          <StatCard label="Avg completeness" value={fmt(summary.avgCompleteness)} suffix="/10" />
+        </div>
+
+        {/* Confidence mix */}
+        {confParts.length > 0 && (
+          <div className="mt-3 rounded-xl border border-border bg-card px-4 py-4 shadow-sm">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Confidence mix
+            </p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {confParts.map(([level, n]) => (
                 <span
                   key={level}
-                  className="rounded-full border border-border bg-background px-2.5 py-1 text-xs text-foreground"
+                  className={`rounded-full border px-2.5 py-1 text-xs font-medium ${confidenceClasses(level)}`}
                 >
                   {level}: {n}
                 </span>
-              ))
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ── Section 2: Patterns ─────────────────────────────────────── */}
+      <div className="mt-8">
+        <SectionHeader>Patterns</SectionHeader>
+        <div className="grid gap-4 lg:grid-cols-2">
+          <div className="flex flex-col rounded-xl border border-border bg-card p-4 shadow-sm">
+            <Histogram histogram={summary.scoreHistogram} />
+          </div>
+          <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Top topics
+            </p>
+            {summary.topicCounts.length === 0 ? (
+              <p className="mt-3 text-sm text-muted-foreground">No topics yet.</p>
+            ) : (
+              <ul className="mt-3 space-y-3">
+                {summary.topicCounts.slice(0, 6).map(({ topic, count }) => {
+                  const maxCount = summary.topicCounts[0].count;
+                  const pct = Math.round((count / maxCount) * 100);
+                  return (
+                    <li key={topic}>
+                      <div className="flex items-center justify-between gap-2 text-sm">
+                        <span className="truncate text-foreground">{topic}</span>
+                        <span className="shrink-0 tabular-nums text-muted-foreground">{count}×</span>
+                      </div>
+                      <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-border">
+                        <div
+                          className="h-full rounded-full bg-muted-foreground/40"
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
             )}
           </div>
         </div>
       </div>
 
-      <div className="mt-8 grid gap-8 lg:grid-cols-2">
-        <Histogram histogram={summary.scoreHistogram} />
-        <div>
-          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            Top topics
+      {/* ── Section 3: Personalised Insights ────────────────────────── */}
+      <div className="mt-8">
+        <SectionHeader>Personalised Insights</SectionHeader>
+        {insights.length === 0 ? (
+          <p className="rounded-xl border border-dashed border-border bg-surface-subtle px-4 py-6 text-center text-sm text-muted-foreground">
+            {summary.count < 3
+              ? "Submit at least 3 answers to generate insights."
+              : "No clear patterns yet. Keep submitting to build a fuller picture."}
           </p>
-          <ul className="mt-3 space-y-2">
-            {summary.topicCounts.slice(0, 6).map(({ topic, count }) => (
-              <li
-                key={topic}
-                className="flex items-center justify-between gap-2 text-sm"
-              >
-                <span className="truncate text-card-foreground">{topic}</span>
-                <span className="tabular-nums text-muted-foreground">
-                  {count}×
-                </span>
-              </li>
+        ) : (
+          <div className={insightGridClass}>
+            {sortedInsights.map((insight, i) => (
+              <InsightCard key={i} insight={insight} />
             ))}
-          </ul>
-        </div>
+          </div>
+        )}
       </div>
     </>
   );

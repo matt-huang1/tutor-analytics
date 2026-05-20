@@ -1,38 +1,45 @@
 @import "tailwindcss";
 
+/* Force dark mode: dark tokens are the :root default.
+   dark: Tailwind utilities activate via the .dark class (always set on <html>). */
+@variant dark (&:where(.dark, .dark *));
+
 :root {
-  --background: #fafafa;
-  --foreground: #0f0f0f;
-  --muted: #737373;
-  --muted-foreground: #525252;
-  --card: #ffffff;
-  --card-foreground: #0f0f0f;
-  --border: #e5e5e5;
-  --input: #e5e5e5;
-  --ring: #0f0f0f;
-  --accent: #0f0f0f;
-  --accent-foreground: #fafafa;
-  --destructive: #dc2626;
-  --surface-subtle: #f4f4f5;
+  --background: #0d0d10;
+  --foreground: #eceaf6;
+  --muted: #9ca3af;
+  --muted-foreground: #a0a0b0;
+  --card: #18181f;
+  --card-foreground: #eceaf6;
+  --border: #262636;
+  --input: #262636;
+  --ring: #8b5cf6;
+  --accent: #8b5cf6;
+  --accent-foreground: #ffffff;
+  --accent-soft: #1e1050;
+  --destructive: #f87171;
+  --surface-subtle: #111116;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #09090b;
-    --foreground: #fafafa;
-    --muted: #a1a1aa;
-    --muted-foreground: #a1a1aa;
-    --card: #18181b;
-    --card-foreground: #fafafa;
-    --border: #27272a;
-    --input: #27272a;
-    --ring: #fafafa;
-    --accent: #fafafa;
-    --accent-foreground: #09090b;
-    --destructive: #f87171;
-    --surface-subtle: #18181b;
-  }
-}
+/*
+ * Light palette — preserved in codebase, not active at runtime.
+ * To re-enable: restore these to :root and remove the @variant dark override.
+ *
+ * --background: #f4f3fb;
+ * --foreground: #111827;
+ * --muted: #6b7280;
+ * --muted-foreground: #4b5563;
+ * --card: #ffffff;
+ * --card-foreground: #111827;
+ * --border: #e2dfee;
+ * --input: #e5e7eb;
+ * --ring: #7c3aed;
+ * --accent: #7c3aed;
+ * --accent-foreground: #ffffff;
+ * --accent-soft: #ede9fe;
+ * --destructive: #dc2626;
+ * --surface-subtle: #edeafc;
+ */
 
 @theme inline {
   --color-background: var(--background);
@@ -46,6 +53,7 @@
   --color-ring: var(--ring);
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
+  --color-accent-soft: var(--accent-soft);
   --color-destructive: var(--destructive);
   --color-surface-subtle: var(--surface-subtle);
   --font-sans: var(--font-geist-sans);

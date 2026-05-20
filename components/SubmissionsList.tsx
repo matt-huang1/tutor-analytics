@@ -6,6 +6,7 @@ import {
   type ErrorTypeId,
 } from "../lib/diagnostics";
 import { supabase } from "../lib/supabase";
+import { confidenceClasses, errorTypeClasses, formatMathText, scoreClasses } from "../lib/format";
 
 type SubmissionRow = {
   id: string;
@@ -40,7 +41,7 @@ function renderTagList(items: string[] | null | undefined, emptyLabel: string) {
           key={`${item}-${index}`}
           className="rounded-full border border-border bg-background px-2.5 py-1 text-xs text-foreground"
         >
-          {item}
+          {formatMathText(item)}
         </li>
       ))}
     </ul>
@@ -142,7 +143,7 @@ export default function SubmissionsList() {
 
       {!errorMessage && submissions.length === 0 && (
         <p className="mt-4 rounded-xl border border-dashed border-border bg-card/50 px-4 py-8 text-center text-sm text-muted-foreground">
-          Nothing here yet. Submit a question and answer above.
+          No submissions yet. Head to Submit to answer your first question.
         </p>
       )}
 
@@ -157,7 +158,7 @@ export default function SubmissionsList() {
 
           return (
             <li key={item.id}>
-              <details className="group rounded-xl border border-border bg-card shadow-sm">
+              <details className="group rounded-xl border border-border bg-card shadow-sm transition-all duration-150 hover:shadow-md">
                 <summary className="flex cursor-pointer list-none items-start gap-3 p-4 [&::-webkit-details-marker]:hidden">
                   <span
                     className="mt-1.5 shrink-0 text-muted-foreground transition-transform group-open:rotate-90"
@@ -166,20 +167,26 @@ export default function SubmissionsList() {
                     ▸
                   </span>
                   <div className="min-w-0 flex-1">
-                    <p className="line-clamp-2 text-sm font-medium text-card-foreground">
-                      {item.question}
-                    </p>
-                    <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                      <span className="rounded-md bg-surface-subtle px-2 py-0.5 font-semibold text-card-foreground">
+                    <div className="flex items-start justify-between gap-3">
+                      <p className="line-clamp-2 text-sm font-medium text-card-foreground">
+                        {formatMathText(item.question)}
+                      </p>
+                      {dateStr ? (
+                        <span className="shrink-0 text-[11px] text-muted-foreground/60">
+                          {dateStr}
+                        </span>
+                      ) : null}
+                    </div>
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      <span className={`rounded-md border px-2 py-0.5 text-xs font-semibold ${scoreClasses(item.score)}`}>
                         {item.score ?? "—"}/10
                       </span>
-                      <span className="truncate">
+                      <span className="truncate text-xs text-muted-foreground">
                         {item.topic ?? "Topic"}
                         {item.subtopic ? ` · ${item.subtopic}` : ""}
                       </span>
-                      {dateStr ? <span>{dateStr}</span> : null}
                       {userConf ? (
-                        <span className="rounded-md border border-border px-2 py-0.5">
+                        <span className={`rounded-md border px-2 py-0.5 text-xs ${confidenceClasses(userConf)}`}>
                           You: {userConf}
                         </span>
                       ) : null}
@@ -189,7 +196,7 @@ export default function SubmissionsList() {
                         {errors.slice(0, 3).map((id) => (
                           <span
                             key={id}
-                            className="rounded-full bg-background px-2 py-0.5 text-[11px] text-foreground ring-1 ring-border"
+                            className={`rounded-full border px-2 py-0.5 text-[11px] ${errorTypeClasses(id)}`}
                           >
                             {errorTypeLabel(id)}
                           </span>
@@ -200,48 +207,39 @@ export default function SubmissionsList() {
                 </summary>
 
                 <div className="border-t border-border px-4 pb-4 pt-1">
-                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                    Question
-                  </p>
-                  <p className="mt-1 text-sm text-card-foreground">{item.question}</p>
-
                   <p className="mt-4 text-xs font-medium uppercase tracking-wide text-muted-foreground">
                     Your answer
                   </p>
                   <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
-                    {item.answer}
+                    {formatMathText(item.answer)}
                   </p>
 
                   <div className="mt-4 rounded-lg border border-border bg-surface-subtle p-4">
                     <div className="flex flex-wrap gap-2 text-xs">
                       {errors.length > 0 ? (
                         <div className="w-full">
-                          <p className="font-medium uppercase tracking-wide text-muted-foreground">
-                            Issue patterns (AI)
+                          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                            Issue patterns
                           </p>
                           <ul className="mt-2 flex flex-wrap gap-2">
                             {errors.map((id) => (
                               <li
                                 key={id}
-                                className="rounded-full border border-border bg-background px-2.5 py-1 text-foreground"
+                                className={`rounded-full border px-2.5 py-1 text-xs ${errorTypeClasses(id)}`}
                               >
                                 {errorTypeLabel(id)}
                               </li>
                             ))}
                           </ul>
                         </div>
-                      ) : (
-                        <p className="text-muted-foreground">
-                          No issue pattern tags for this row (older submission).
-                        </p>
-                      )}
+                      ) : null}
                     </div>
 
                     <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-border pt-4">
                       <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                        Scores (AI)
+                        Scores
                       </span>
-                      <span className="rounded-md bg-background px-2 py-1 text-sm font-semibold">
+                      <span className={`rounded-md border px-2 py-1 text-sm font-semibold ${scoreClasses(item.score)}`}>
                         Overall {item.score ?? "—"}/10
                       </span>
                       <span className="text-sm text-card-foreground">
@@ -256,14 +254,6 @@ export default function SubmissionsList() {
                         </span>
                       ) : null}
                     </div>
-
-                    <p className="mt-4 text-sm text-card-foreground">
-                      <span className="font-medium text-muted-foreground">
-                        Topic:{" "}
-                      </span>
-                      {item.topic ?? "N/A"}
-                      {item.subtopic ? ` / ${item.subtopic}` : ""}
-                    </p>
 
                     <div className="mt-4 grid gap-4 sm:grid-cols-2">
                       <div>
@@ -297,11 +287,11 @@ export default function SubmissionsList() {
                     </div>
 
                     <div className="mt-4">
-                      <p className="font-medium text-muted-foreground">
+                      <p className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
                         Suggested next step
                       </p>
                       <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed text-card-foreground">
-                        {item.suggested_next_step ?? "Not provided"}
+                        {formatMathText(item.suggested_next_step) || "Not provided"}
                       </p>
                     </div>
                   </div>

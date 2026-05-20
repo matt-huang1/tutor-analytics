@@ -1,42 +1,88 @@
-<<<<<<< HEAD
 # AI Tutor Analytics
 
-Full-stack AI app that evaluates student answers using structured AI feedback and analytics.
-=======
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+An AI-powered learning analytics platform that evaluates student answers, identifies recurring mistake patterns, and surfaces actionable insights — without needing a human tutor to interpret the data.
 
-## Getting Started
+---
 
-First, run the development server:
+Most feedback tools tell students *what* they got wrong. This one tells them *why they keep getting it wrong*. Each submitted answer is evaluated by an AI tutor and tagged with structured diagnostic labels — error types, strengths, missing concepts, and confidence level. A deterministic insight engine then runs rule-based detectors across submission history to surface named learning signals: overconfidence gaps, recurring weaknesses, topic stagnation, and consistent strengths.
+
+The insight engine uses no AI at runtime — it's fully rule-based, auditable, and produces consistent results. This means zero hallucination risk on the analytics layer, and insights that can be explained and verified without treating the model as a black box.
+
+---
+
+## Screenshots
+
+*Learning signal overview*
+![Learning signal overview](public/screenshot-overview.png)
+
+*Personalised diagnostic insights*
+![Personalised diagnostic insights](public/screenshot-insights.png)
+
+---
+
+## How it works
+
+- **Q&A submission** — student submits a question and answer, self-reporting their confidence level before receiving feedback
+- **Structured AI tagging** — OpenAI evaluates the answer and returns a fixed-schema JSON object: scores (overall, reasoning, completeness), error types from a closed taxonomy, strengths, misconceptions, missing concepts, and a suggested next step
+- **Sanitisation layer** — all AI output is validated at the API boundary against a closed label set; out-of-range values are rejected before hitting the database
+- **Deterministic analytics engine** — rule-based detectors run across submission history with no additional AI calls, producing consistent and auditable insights
+- **Live dashboard** — insights, score distribution, topic breakdown, and confidence trends update automatically after each submission via a custom browser event
+
+---
+
+## Key features
+
+- **Insights dashboard** — classifies learning signals as Risk, Watch, or Strength with clear diagnostic copy
+- **Overconfidence detection** — flags when a student's self-reported confidence consistently exceeds their actual performance
+- **Persistent weakness detection** — identifies the dominant error pattern across all submissions (e.g. repeated conceptual misunderstanding)
+- **Topic stagnation detection** — detects when a student's scores on a specific topic have stopped improving over multiple attempts
+- **Strength recognition** — surfaces topics where the student is performing reliably well, to reinforce confidence
+- **Structured feedback system** — each submission returns a scored, tagged diagnostic with a concrete next step, not just a grade
+
+---
+
+## Stack
+
+| Layer | Technology |
+|-------|-----------|
+| Framework | Next.js 16 (App Router) |
+| AI evaluation | OpenAI `gpt-4o-mini` with structured JSON output |
+| Database | Supabase (Postgres) |
+| Language | TypeScript |
+| Styling | Tailwind CSS v4, dark-first design system |
+
+---
+
+## Running locally
 
 ```bash
+npm install
+cp .env.example .env.local  # add OPENAI_API_KEY, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
+node scripts/seed.js        # populate demo data (14 rows, all 4 detectors active)
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Navigate to `http://localhost:3000` — opens directly on the Insights dashboard.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+---
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Project structure
 
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
->>>>>>> 8fef4b7 (Initial commit from Create Next App)
+```
+app/
+  insights/     ← analytics dashboard (default landing page)
+  submit/       ← Q&A submission form with inline AI feedback
+  history/      ← past submissions with expandable diagnostics
+  api/feedback/ ← evaluation endpoint (OpenAI + Supabase write)
+components/
+  LearningAnalytics.tsx  ← insights dashboard and stat cards
+  SubmissionsList.tsx    ← collapsible submission history
+  Hero.tsx               ← submit form with live feedback panel
+  FeedbackPanel.tsx      ← inline AI evaluation result
+lib/
+  analytics.ts   ← deterministic insight engine (pure functions)
+  diagnostics.ts ← error type taxonomy and sanitisation
+  format.ts      ← math formatting and colour utilities
+scripts/
+  seed.js        ← demo dataset (14 curated rows, all 4 detectors active)
+```

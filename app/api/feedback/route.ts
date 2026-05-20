@@ -89,7 +89,7 @@ Return this exact JSON shape:
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { question, answer, student_confidence } = body;
+    const { question, answer, student_confidence, submission_id } = body;
 
     if (!question || !answer) {
       return Response.json(
@@ -144,23 +144,27 @@ ${answer}`,
     const diagnostics = sanitizeDiagnostics(parsed);
 
     const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
-    const { error: insertError } = await supabase.from("submissions").insert([
-      {
-        question,
-        answer,
-        score: diagnostics.score,
-        topic: diagnostics.topic,
-        subtopic: diagnostics.subtopic,
-        strengths: diagnostics.strengths,
-        misconceptions: diagnostics.misconceptions,
-        missing_concepts: diagnostics.missing_concepts,
-        suggested_next_step: diagnostics.suggested_next_step,
-        reasoning_quality: diagnostics.reasoning_quality,
-        answer_completeness: diagnostics.answer_completeness,
-        error_types: diagnostics.error_types,
-        student_confidence,
-      },
-    ]);
+    const { error: insertError } = await supabase.from("submissions").upsert(
+      [
+        {
+          submission_id: typeof submission_id === "string" ? submission_id : null,
+          question,
+          answer,
+          score: diagnostics.score,
+          topic: diagnostics.topic,
+          subtopic: diagnostics.subtopic,
+          strengths: diagnostics.strengths,
+          misconceptions: diagnostics.misconceptions,
+          missing_concepts: diagnostics.missing_concepts,
+          suggested_next_step: diagnostics.suggested_next_step,
+          reasoning_quality: diagnostics.reasoning_quality,
+          answer_completeness: diagnostics.answer_completeness,
+          error_types: diagnostics.error_types,
+          student_confidence,
+        },
+      ],
+      { onConflict: "submission_id", ignoreDuplicates: true }
+    );
 
     if (insertError) {
       console.error("SUPABASE INSERT ERROR:", insertError);
